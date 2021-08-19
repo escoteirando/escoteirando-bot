@@ -1,0 +1,25 @@
+package consts
+
+const (
+	Warning          string = "⚠"
+	OK               string = "🆗"
+	ThumsUp          string = "👍"
+	ThumbsDown       string = "👎"
+	Knot             string = "\U0001FAA2"
+	HourglassNotDone string = "⏳"
+	HourglassDone    string = "⌛"
+	Robot            string = "🤖"
+	FlorDeLis        string = "⚜"
+	Palmas           string = "👏"
+	MelhorPossivel   string = "✌"
+	Birthday         string = "🎂"
+	Rocket           string = "🚀"
+	Clown            string = "🤡"
+	Rabbit           string = "🐰"
+	Cross            string = "✝"
+	Brasil           string = "🇧🇷"
+	FlorBranca       string = "🌼"
+	FireWorks        string = "🎆"
+	Worker           string = "👷"
+	ArvoreNatal      string = "🎄"
+)
