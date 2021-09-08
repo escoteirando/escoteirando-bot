@@ -14,7 +14,6 @@ type (
 		Type           string
 		AllAdmin       bool
 		CodSecao       int
-		LastSetupCall  time.Time
 		AuthKey        string
 		AuthValidUntil time.Time
 		MappaUserId    int

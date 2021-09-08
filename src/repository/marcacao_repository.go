@@ -2,6 +2,9 @@ package repository
 
 import (
 	"github.com/guionardo/escoteirando-bot/src/domain"
+	"github.com/guionardo/escoteirando-bot/src/dto"
+	"github.com/guionardo/escoteirando-bot/src/mappa"
+	"gorm.io/gorm/clause"
 	"log"
 	"time"
 )
@@ -52,5 +55,59 @@ func SetMarcacoesAsSent(idMarcacoes []uint) error {
 	} else {
 		log.Printf("Error on saving sent marcacoes: %v", result.Error)
 	}
+	return result.Error
+}
+
+func GetAllEscotistasIds() ([]int, error) {
+	var results []domain.MappaMarcacao
+	result := GetDB().
+		Distinct("codigo_ultimo_escotista").
+		Select("codigo_ultimo_escotista").
+		Where("codigo_ultimo_escotista > 0").
+		Model(&domain.MappaMarcacao{}).
+		Find(&results)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	response := make([]int, result.RowsAffected)
+	for i, cod := range results {
+		response[i] = cod.CodigoUltimoEscotista
+	}
+	return response, nil
+}
+
+func GetUltimaConsultaMarcacao(codSecao int) time.Time {
+	var secao domain.MappaSecao
+	response := GetDB().Find(&secao, codSecao)
+	if response.Error != nil {
+		return time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+	return secao.UltimaConsultaMarcacao
+}
+
+func SetUltimaConsultaMarcacao(codSecao int, quando time.Time) error {
+	var secao domain.MappaSecao
+	response := GetDB().Find(&secao, codSecao)
+	if response.Error != nil {
+		return response.Error
+	}
+	CanIWrite()
+	secao.UltimaConsultaMarcacao = quando
+	response = GetDB().Save(&secao)
+	YouCanWrite()
+	return response.Error
+}
+
+func SetMarcacoes(marcacoes []mappa.Marcacao) error {
+	dbMarcacoes := make([]domain.MappaMarcacao, len(marcacoes))
+	for i, marcacao := range marcacoes {
+		dbMarcacoes[i]=dto.CreateMarcacao(marcacao)
+	}
+	CanIWrite()
+	result := GetDB().
+		Clauses(clause.OnConflict{UpdateAll: true}).
+		CreateInBatches(dbMarcacoes,10)
+	YouCanWrite()
 	return result.Error
 }

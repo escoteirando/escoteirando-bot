@@ -10,39 +10,34 @@ import (
 )
 
 var (
-	messageChannel      chan domain.TelegramMessage
-	autoDescructChannel chan domain.TelegramMessage
+	MessageChannel      = make(chan domain.TelegramMessage)
+	AutoDestructChannel = make(chan domain.TelegramMessage)
 )
 
 func AutoDestruct(message tgbotapi.Message, in time.Duration) {
 	tgMsg := domain.TelegramMessage{MessageId: message.MessageID,
 		ChannelId:    message.Chat.ID,
 		AutoDestruct: time.Now().Add(in)}
-	autoDescructChannel <- tgMsg
+	AutoDestructChannel <- tgMsg
 	log.Printf("Autodestruct message %d/%d @ %v", tgMsg.ChannelId, tgMsg.MessageId, tgMsg.AutoDestruct)
 }
-func SetupMessageChanel(mChannel chan domain.TelegramMessage) {
-	messageChannel = mChannel
-}
-func SetupAutoDestructChannel(mChannel chan domain.TelegramMessage) {
-	autoDescructChannel = mChannel
-}
 
-func SendTextMessage(chatId int64, message string, replyToMsgId int) (tgbotapi.Message, error) {
-	msg := tgbotapi.NewMessage(chatId, message)
-	if strings.Contains(message, "</") {
-		msg.ParseMode = "html"
-	}
-	if replyToMsgId != 0 {
-		msg.ReplyToMessageID = replyToMsgId
-	}
-
-	responseMessage := enqueueAndWait(chatId, msg)
-	if responseMessage.MessageID < 1 {
-		return responseMessage, fmt.Errorf("failed to send message %d:%s", chatId, message)
-	}
-	return responseMessage, nil
-}
+//TODO: Remover
+//func SendTextMessage(chatId int64, message string, replyToMsgId int) (tgbotapi.Message, error) {
+//	msg := tgbotapi.NewMessage(chatId, message)
+//	if strings.Contains(message, "</") {
+//		msg.ParseMode = "html"
+//	}
+//	if replyToMsgId != 0 {
+//		msg.ReplyToMessageID = replyToMsgId
+//	}
+//
+//	responseMessage := enqueueAndWait(chatId, msg)
+//	if responseMessage.MessageID < 1 {
+//		return responseMessage, fmt.Errorf("failed to send message %d:%s", chatId, message)
+//	}
+//	return responseMessage, nil
+//}
 
 func SendButtonMessage(chatId int64, caption string, message string, command string) (tgbotapi.Message, error) {
 	var button tgbotapi.InlineKeyboardButton
@@ -66,7 +61,32 @@ func SendButtonMessage(chatId int64, caption string, message string, command str
 	return responseMessage, nil
 }
 
+func SendCommandButtons(chatId int64, caption string, buttons []CommandButton) (tgbotapi.Message, error) {
+	var keyboardRow []tgbotapi.InlineKeyboardButton
+	keyboardRows := make([][]tgbotapi.InlineKeyboardButton, 0)
+	for _, command := range buttons {
+		if keyboardRow == nil {
+			keyboardRow = make([]tgbotapi.InlineKeyboardButton, 0)
+		}
+		keyboardRow = append(keyboardRow, createCommandButton(command))
+		if len(keyboardRow) == 2 {
+			keyboardRows = append(keyboardRows, keyboardRow)
+			keyboardRow = nil
+		}
+	}
+	if keyboardRow != nil {
+		keyboardRows = append(keyboardRows, keyboardRow)
+	}
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(keyboardRows...)
+	msg := tgbotapi.NewMessage(chatId, caption)
+	msg.ReplyMarkup = keyboard
+	responseMessage := enqueueAndWait(chatId, msg)
+	if responseMessage.MessageID < 1 {
+		return responseMessage, fmt.Errorf("failed to send message %d", chatId)
+	}
+	return responseMessage, nil
 
+}
 func DeleteTextMessage(chatId int64, messageId int) {
 	msg := tgbotapi.NewDeleteMessage(chatId, messageId)
 	responseMessage := enqueueDeleteAndWait(chatId, msg)
@@ -79,10 +99,9 @@ func enqueueDeleteAndWait(chatId int64, msg tgbotapi.DeleteMessageConfig) tgbota
 		ChannelId:       chatId,
 		ResponseTo:      0,
 		Message:         msg,
-		Type:            0,
 		ResponseChannel: waitingChannel,
 	}
-	messageChannel <- tgMsg
+	MessageChannel <- tgMsg
 	responseMessage := <-waitingChannel
 	return responseMessage
 }
@@ -104,10 +123,9 @@ func enqueueEditAndWait(chatId int64, msg tgbotapi.EditMessageTextConfig) tgbota
 		ChannelId:       chatId,
 		ResponseTo:      0,
 		Message:         msg,
-		Type:            0,
 		ResponseChannel: waitingChannel,
 	}
-	messageChannel <- tgMsg
+	MessageChannel <- tgMsg
 	responseMessage := <-waitingChannel
 	return responseMessage
 }
@@ -118,10 +136,9 @@ func enqueueAndWait(chatId int64, msg tgbotapi.MessageConfig) tgbotapi.Message {
 		ChannelId:       chatId,
 		ResponseTo:      msg.ReplyToMessageID,
 		Message:         msg,
-		Type:            0,
 		ResponseChannel: waitingChannel,
 	}
-	messageChannel <- tgMsg
+	MessageChannel <- tgMsg
 	responseMessage := <-waitingChannel
 	return responseMessage
 }

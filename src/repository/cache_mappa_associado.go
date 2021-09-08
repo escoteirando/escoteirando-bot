@@ -1,10 +1,7 @@
 package repository
 
 import (
-	"fmt"
 	"github.com/guionardo/escoteirando-bot/src/domain"
-	"gorm.io/gorm"
-	"log"
 )
 
 type CachedMappaAssociado struct {
@@ -22,7 +19,7 @@ func (cache *CachedMappaAssociado) GetAssociado(codAssociado int) (domain.MappaA
 	}
 	var progressao domain.MappaAssociado
 	response := GetDB().First(&progressao, codAssociado)
-	err := parseResponse(response, "GetAssociado", codAssociado)
+	err := ParseResponse(response, "GetAssociado", codAssociado)
 	if err == nil {
 		cache.associados[codAssociado] = progressao
 	}
@@ -30,15 +27,4 @@ func (cache *CachedMappaAssociado) GetAssociado(codAssociado int) (domain.MappaA
 	return progressao, err
 }
 
-func parseResponse(response *gorm.DB, description string, id interface{}) error {
-	var err error
-	if response.Error != nil {
-		err = response.Error
-	} else if response.RowsAffected < 1 {
-		err = fmt.Errorf("returns empty")
-	}
-	if err != nil {
-		log.Printf("Query [%s(%v)] exception: %v", description, id, err)
-	}
-	return err
-}
+

@@ -18,7 +18,7 @@ func (cache *CachedMappaSecao) GetSecao(codSecao int) (domain.MappaSecao, error)
 	}
 	var secao domain.MappaSecao
 	response := GetDB().First(&secao, codSecao)
-	err := parseResponse(response, "GetSecao", codSecao)
+	err := ParseResponse(response, "GetSecao", codSecao)
 	if err == nil {
 		cache.secoes[codSecao] = secao
 	}

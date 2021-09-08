@@ -1,45 +1,41 @@
 package services
 
 import (
+	b64 "encoding/base64"
+	"encoding/json"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	bot2 "github.com/guionardo/escoteirando-bot/src/bot"
 	"github.com/guionardo/escoteirando-bot/src/domain"
 	"github.com/guionardo/escoteirando-bot/src/repository"
+	"github.com/guionardo/escoteirando-bot/src/utils"
+	"net/url"
 	"time"
 )
 
-func GetContext(message *tgbotapi.Message) domain.Context {
-	context := domain.Context{
-		CodSecao:    0,
-		ChatName:    "",
-		ChatId:      0,
-		AuthKey:     "",
-		MappaUserId: 0,
-	}
-	db := repository.GetDB()
-	var chatModel domain.Chat
-	db.First(&chatModel, message.Chat.ID)
-	if chatModel.ID != 0 {
-		context.CodSecao = chatModel.CodSecao
-		context.ChatName = fmt.Sprintf("%s:%s", chatModel.Type, chatModel.Title)
-		context.ChatId = message.Chat.ID
-		context.AuthKey = chatModel.AuthKey
-		context.MappaUserId = chatModel.MappaUserId
-		context.CodSecao = chatModel.CodSecao
-		context.AuthValidUntil = chatModel.AuthValidUntil
-	} else {
-		chatModel = domain.Chat{
-			ID:            message.Chat.ID,
-			Title:         message.Chat.Title,
-			Type:          message.Chat.Type,
-			AllAdmin:      message.Chat.AllMembersAreAdmins,
-			CodSecao:      0,
-			LastSetupCall: time.Unix(0, 0),
+func GetContext(message *tgbotapi.Message) *domain.Context {
+	context, err := repository.GetFromChat(message.Chat.ID)
+	if err != nil {
+		err = repository.SaveChatFromMessage(message)
+		if err == nil {
+			context, err = repository.GetFromChat(message.Chat.ID)
 		}
-		db.Create(&chatModel)
 	}
-	CheckContextSetup(chatModel)
+	if context != nil {
+		CheckContextSetup(*context)
+	}
 	return context
+}
+
+func GetContextFromChat(chat domain.Chat) domain.Context {
+	return domain.Context{
+		CodSecao:       chat.CodSecao,
+		ChatName:       fmt.Sprintf("%s:%s", chat.Type, chat.Title),
+		ChatId:         chat.ID,
+		AuthKey:        chat.AuthKey,
+		MappaUserId:    chat.MappaUserId,
+		AuthValidUntil: chat.AuthValidUntil,
+	}
 }
 
 func GetContextForSection(codSecao int) (domain.Context, error) {
@@ -103,14 +99,14 @@ func SetContextSetup(ctx domain.Context, authKey domain.AuthKey) bool {
 	return false
 }
 
-func CheckContextSetup(chat domain.Chat) {
-	if 0 == chat.ID {
+func CheckContextSetup(context domain.Context) {
+	if 0 == context.ChatId {
 		return
 	}
-	if len(chat.AuthKey) == 0 {
-		schedule, canRun := ScheduleGet(fmt.Sprintf("context_%d", chat.ID), time.Duration(6)*time.Hour, false)
+	if len(context.AuthKey) == 0 {
+		schedule, canRun := ScheduleGet(fmt.Sprintf("context_%d", context.ChatId), time.Duration(6)*time.Hour, false)
 		if canRun {
-			msg, err := SendButtonMessage(chat.ID, "Admin! Faça a configuração deste chat", "Setup", "/setup")
+			msg, err := SendButtonMessage(context.ChatId, "Admin! Faça a configuração deste chat", "Setup", "/setup")
 			if err == nil {
 				AutoDestruct(msg, time.Duration(30)*time.Second)
 			}
@@ -118,11 +114,11 @@ func CheckContextSetup(chat domain.Chat) {
 		}
 		return
 	}
-	if chat.AuthValidUntil.Before(time.Now()) {
+	if context.AuthValidUntil.Before(time.Now()) {
 		// Autorização fora da validade
-		schedule, canRun := ScheduleGet(fmt.Sprintf("auth_%d", chat.ID), time.Duration(15)*time.Minute, true)
+		schedule, canRun := ScheduleGet(fmt.Sprintf("auth_%d", context.ChatId), time.Duration(15)*time.Minute, true)
 		if canRun {
-			if ctx, err := GetContextForSection(chat.CodSecao); err == nil {
+			if ctx, err := GetContextForSection(context.CodSecao); err == nil {
 				SendAuthCommandMessage(ctx, 0, false)
 				ScheduleUpdate(&schedule)
 			}
@@ -130,14 +126,68 @@ func CheckContextSetup(chat domain.Chat) {
 
 		return
 	} else {
-		authRestante := time.Now().Sub(chat.AuthValidUntil)
+		authRestante := time.Now().Sub(context.AuthValidUntil)
 		if authRestante.Hours() < 24 {
-			schedule, canRun := ScheduleGet(fmt.Sprintf("validAuth_%d", chat.ID), time.Duration(6)*time.Hour, false)
+			schedule, canRun := ScheduleGet(fmt.Sprintf("validAuth_%d", context.ChatId), time.Duration(6)*time.Hour, false)
 			if canRun {
-				SendTextMessage(chat.ID, fmt.Sprintf("Autorização de acesso ao mAPPa válida até: %s", chat.AuthValidUntil.Format(time.RFC822)), 0)
+				bot2.GetCurrentBot().SendTextMessage(context.ChatId, fmt.Sprintf("Autorização de acesso ao mAPPa válida até: %s", context.AuthValidUntil.Format(time.RFC822)))
 				ScheduleUpdate(&schedule)
 			}
 		}
 	}
 
+}
+
+func GetUserIsAdmin(chat *tgbotapi.Chat, from *tgbotapi.User) bool {
+	bot := bot2.GetCurrentBotInstance()
+	admins, err := bot.GetChatAdministrators(chat.ChatConfig())
+	if err != nil {
+		return false
+	}
+	for _, user := range admins {
+		if from.ID == user.User.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func SendContextAuthRenewMessage(chatId int64) {
+	sendContextAuthMessage(chatId,
+		"ADMINISTRADOR: Acesse o link a seguir para renovar a autorização",
+		fmt.Sprintf("authRenew_%d", chatId),
+		time.Duration(1)*time.Hour)
+}
+
+func SendContextAuthSetupMessage(chatId int64) {
+	sendContextAuthMessage(chatId,
+		"ADMINISTRADOR: Acesse o link a seguir para autorizar a conexão com os dados da seção",
+		fmt.Sprintf("authSetup_%d", chatId),
+		time.Duration(1)*time.Hour)
+}
+
+func sendContextAuthMessage(chatId int64, message string, scheduleName string, scheduleInterval time.Duration) {
+	schedule, canRun := ScheduleGet(scheduleName, scheduleInterval, true)
+
+	if !canRun {
+		return
+	}
+	env := utils.GetEnvironmentSetup()
+	ctxFrontend := domain.FrontendContext{
+		CId: chatId,
+		MId: 0,
+	}
+	jsonFrontend, _ := json.Marshal(ctxFrontend)
+	sEnc := b64.StdEncoding.EncodeToString(jsonFrontend)
+	encodedUrl := fmt.Sprintf("%s/%s", env.FrontEndUrl, sEnc)
+	decodedUrl, _ := url.QueryUnescape(encodedUrl)
+
+	if msg, err := bot2.GetCurrentBot().SendButtonMessage(chatId,
+		message,
+		"Autorização",
+		decodedUrl); err == nil {
+
+		AutoDestruct(msg, time.Duration(20)*time.Second)
+	}
+	ScheduleUpdate(&schedule)
 }

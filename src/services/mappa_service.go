@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	bot2 "github.com/guionardo/escoteirando-bot/src/bot"
 	"github.com/guionardo/escoteirando-bot/src/consts"
 	"github.com/guionardo/escoteirando-bot/src/domain"
+	"github.com/guionardo/escoteirando-bot/src/dto"
 	"github.com/guionardo/escoteirando-bot/src/mappa"
 	"github.com/guionardo/escoteirando-bot/src/repository"
 	"github.com/guionardo/escoteirando-bot/src/utils"
@@ -69,9 +71,10 @@ func saveBody(url string, body []byte) {
 }
 
 func MappaSetupAuth(ctx *domain.Context, msg tgbotapi.Message) error {
+
 	msg, err := EditTextMessage(msg, consts.HourglassNotDone+" Identificando escotista")
 	if err != nil {
-		return fmt.Errorf("Erro na identificação do escotista")
+		return fmt.Errorf("erro na identificação do escotista")
 	}
 	// Salvando o escotista
 	escotista, err := mappaSaveEscotista(*ctx, msg)
@@ -85,75 +88,34 @@ func MappaSetupAuth(ctx *domain.Context, msg tgbotapi.Message) error {
 	return err
 }
 
-func MappaSetupAuth_(ctx *domain.Context) error {
-
-	msg, err := SendMessage(ctx.ChatId, consts.HourglassNotDone+" Iniciando configuração da seção", 0)
-	if err != nil {
-		return err
-	}
-	// Salvando o escotista
-	escotista, err := mappaSaveEscotista(*ctx, msg)
-	if err != nil {
-		return err
-	}
-	if err = mappaSaveAssociado(*ctx, escotista, msg); err != nil {
-		return err
-	}
-
-	if err = mappaSaveGrupos(*ctx, escotista, msg); err != nil {
-		return err
-	}
-	secoes, err := mappaSaveSecoes(*ctx, escotista, msg)
-	if err != nil {
-		return err
-	}
-
-	err = mappaSaveSubSecoes(*ctx, secoes, msg)
-	if err != nil {
-		return err
-	}
-	ctx.CodSecao = secoes[0].ID
-
-	EditMessage(ctx.ChatId, msg.MessageID, consts.HourglassDone+" Configuração da seção concluída")
-	return nil
-}
-
 func mappaSaveSubSecoes(ctx domain.Context, secoes []domain.MappaSecao, mainMsg tgbotapi.Message) error {
+	cbot:=bot2.GetCurrentBot()
 	for _, secao := range secoes {
-		msg, err := SendMessage(ctx.ChatId, fmt.Sprintf("%s Obtendo detalhes da seção %s...", consts.HourglassNotDone, secao.ToString()), mainMsg.MessageID)
-		if err != nil {
-			return err
-		}
+		msg := cbot.SendTextReply(ctx.ChatId, fmt.Sprintf("%s Obtendo detalhes da seção %s...", consts.HourglassNotDone, secao.ToString()), mainMsg.MessageID)
 		subSecoes, err := MappaGetEquipe(ctx, ctx.MappaUserId, secao.ID)
 		if err != nil {
 			return err
 		}
 		for _, subSecao := range subSecoes {
-			msgSec, err := SendMessage(ctx.ChatId, fmt.Sprintf("%s Obtendo detalhes da subseção %s...", consts.HourglassNotDone, subSecao.Nome), msg.MessageID)
-			dbSubSecao := domain.MappaSubSecao{
-				ID:           subSecao.Codigo,
-				Nome:         subSecao.Nome,
-				CodSecao:     subSecao.CodigoSecao,
-				CodLider:     subSecao.CodigoLider,
-				CodViceLider: subSecao.CodigoViceLider,
-			}
+			msgSec := cbot.SendTextReply(ctx.ChatId, fmt.Sprintf("%s Obtendo detalhes da subseção %s...", consts.HourglassNotDone, subSecao.Nome), msg.MessageID)
+			dbSubSecao := dto.CreateSubsecao(subSecao)
 			err = repository.SaveSubSecao(dbSubSecao)
 			if err != nil {
-				EditMessage(ctx.ChatId, msgSec.MessageID, fmt.Sprintf("%s Erro ao gravar dados da seção %s - %v", consts.Warning, subSecao.Nome, err))
+				bot2.GetCurrentBot().EditMessage(ctx.ChatId, msgSec.MessageID, fmt.Sprintf("%s Erro ao gravar dados da seção %s - %v", consts.Warning, subSecao.Nome, err))
 				return err
 			}
-			EditMessage(ctx.ChatId, msgSec.MessageID, fmt.Sprintf("%s SubSeção: %s", consts.HourglassNotDone, subSecao.Nome))
+			bot2.GetCurrentBot().EditMessage(ctx.ChatId, msgSec.MessageID, fmt.Sprintf("%s SubSeção: %s", consts.HourglassNotDone, subSecao.Nome))
 
 			nomesAssociados := make([]string, len(subSecao.Associados))
 			for index, associado := range subSecao.Associados {
 				dbAssociado, err := MappaSaveAssociadoEquipe(ctx, associado, msg, false)
 				if err != nil {
-					EditMessage(ctx.ChatId, msgSec.MessageID, fmt.Sprintf("%s Erro ao gravar dados do associado %s - %v", consts.Warning, associado.Nome, err))
+					bot2.GetCurrentBot().EditMessage(ctx.ChatId, msgSec.MessageID, fmt.Sprintf("%s Erro ao gravar dados do associado %s - %v", consts.Warning, associado.Nome, err))
 					return err
 				}
 				nomesAssociados[index] = dbAssociado.ToString()
 			}
-			EditMessage(ctx.ChatId, msgSec.MessageID, fmt.Sprintf("%s SubSeção %s:\n%s", consts.ThumsUp, subSecao.Nome, strings.Join(nomesAssociados, "\n")))
+			bot2.GetCurrentBot().EditMessage(ctx.ChatId, msgSec.MessageID, fmt.Sprintf("%s SubSeção %s:\n%s", consts.ThumsUp, subSecao.Nome, strings.Join(nomesAssociados, "\n")))
 		}
 	}
 	return nil
@@ -181,23 +143,20 @@ func MappaSaveAssociadoEquipe(ctx domain.Context, associado mappa.Associado, msg
 	}
 
 	if err := repository.SaveAssociado(dbAssociado); err != nil {
-		SendMessage(ctx.ChatId, fmt.Sprintf("%s Erro ao gravar o associado: %v", consts.Warning, err), msg.MessageID)
+		bot2.GetCurrentBot().SendTextReply(ctx.ChatId, fmt.Sprintf("%s Erro ao gravar o associado: %v", consts.Warning, err), msg.MessageID)
 		return dbAssociado, err
 	}
 	if sendMessage {
-		SendMessage(ctx.ChatId, fmt.Sprintf("%s Associado gravado com sucesso: %s", consts.ThumsUp, dbAssociado.ToString()), msg.MessageID)
+		bot2.GetCurrentBot().SendTextReply(ctx.ChatId, fmt.Sprintf("%s Associado gravado com sucesso: %s", consts.ThumsUp, dbAssociado.ToString()), msg.MessageID)
 	}
 	return dbAssociado, nil
 }
 
-func mappaSaveSecoes(ctx domain.Context, escotista domain.MappaEscotista, mainMsg tgbotapi.Message) ([]domain.MappaSecao, error) {
-	msg, err := SendMessage(ctx.ChatId, consts.HourglassNotDone+" Obtendo dados das seções...", mainMsg.MessageID)
-	if err != nil {
-		return nil, err
-	}
+func mappaSaveSecoes(ctx domain.Context, mainMsg tgbotapi.Message) ([]domain.MappaSecao, error) {
+	msg := bot2.GetCurrentBot().SendTextReply(ctx.ChatId, consts.HourglassNotDone+" Obtendo dados das seções...", mainMsg.MessageID)
 	secoes, err := MappaGetSecoes(ctx, ctx.MappaUserId)
 	if err != nil {
-		EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao carregar dados das seções: %v", consts.Warning, err))
+		bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao carregar dados das seções: %v", consts.Warning, err))
 		return nil, err
 	}
 	savedSecoes := make([]domain.MappaSecao, 0)
@@ -212,25 +171,23 @@ func mappaSaveSecoes(ctx domain.Context, escotista domain.MappaEscotista, mainMs
 		}
 		err = repository.SaveSecao(dbSecao)
 		if err != nil {
-			EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao gravar a seção: %v", consts.Warning, err))
+			bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao gravar a seção: %v", consts.Warning, err))
 			return nil, err
 		}
 		savedSecoes = append(savedSecoes, dbSecao)
 		nomeSecoes = append(nomeSecoes, dbSecao.ToString())
-		EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Seção gravado com sucesso: %s", consts.ThumsUp, dbSecao.ToString()))
+		bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Seção gravado com sucesso: %s", consts.ThumsUp, dbSecao.ToString()))
 	}
-	EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Seção(ões): %s", consts.ThumsUp, strings.Join(nomeSecoes, ", ")))
+	bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Seção(ões): %s", consts.ThumsUp, strings.Join(nomeSecoes, ", ")))
 	return savedSecoes, nil
 }
 
 func mappaSaveGrupos(ctx domain.Context, escotista domain.MappaEscotista, mainMsg tgbotapi.Message) error {
-	msg, err := SendMessage(ctx.ChatId, consts.HourglassNotDone+" Obtendo dados dos grupos escoteiros...", mainMsg.MessageID)
-	if err != nil {
-		return err
-	}
+	msg := bot2.GetCurrentBot().SendTextReply(ctx.ChatId, consts.HourglassNotDone+" Obtendo dados dos grupos escoteiros...", mainMsg.MessageID)
+
 	grupos, err := MappaGetGrupo(ctx, escotista)
 	if err != nil {
-		EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao carregar dados do grupo: %v", consts.Warning, err))
+		bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao carregar dados do grupo: %v", consts.Warning, err))
 		return err
 	}
 	var nomeGrupos = make([]string, 0)
@@ -243,33 +200,30 @@ func mappaSaveGrupos(ctx domain.Context, escotista domain.MappaEscotista, mainMs
 		}
 		err = repository.SaveGrupo(dbGrupo)
 		if err != nil {
-			EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao gravar o grupo: %v", consts.Warning, err))
+			bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao gravar o grupo: %v", consts.Warning, err))
 			return err
 		}
-		EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Grupo gravado com sucesso: %s", consts.ThumsUp, dbGrupo.ToString()))
+		bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Grupo gravado com sucesso: %s", consts.ThumsUp, dbGrupo.ToString()))
 		nomeGrupos = append(nomeGrupos, dbGrupo.ToString())
 	}
-	EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Grupo(s): %s", consts.ThumsUp, strings.Join(nomeGrupos, ", ")))
+	bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Grupo(s): %s", consts.ThumsUp, strings.Join(nomeGrupos, ", ")))
 
 	return nil
 
 }
 
 func mappaSaveAssociado(ctx domain.Context, escotista domain.MappaEscotista, mainMsg tgbotapi.Message) error {
-	msg, err := SendMessage(ctx.ChatId, consts.HourglassNotDone+" Obtendo dados do escotista associado...", mainMsg.MessageID)
-	if err != nil {
-		return err
-	}
+	msg := bot2.GetCurrentBot().SendTextReply(ctx.ChatId, consts.HourglassNotDone+" Obtendo dados do escotista associado...", mainMsg.MessageID)
 	associado, err := MappaGetAssociado(ctx, escotista.CodAssociado)
 	if err != nil {
-		EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao carregar dados do associado: %v", consts.Warning, err))
+		bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao carregar dados do associado: %v", consts.Warning, err))
 		return err
 	}
 	_, err = MappaSaveAssociadoEquipe(ctx, associado, mainMsg, false)
 	if err == nil {
-		EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Associado gravado com sucesso: %s", consts.ThumsUp, associado.Nome))
+		bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Associado gravado com sucesso: %s", consts.ThumsUp, associado.Nome))
 	} else {
-		EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao gravar o associado: %v", consts.Warning, err))
+		bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao gravar o associado: %v", consts.Warning, err))
 	}
 	return err
 }
@@ -278,13 +232,10 @@ func mappaSaveEscotista(ctx domain.Context, mainMsg tgbotapi.Message) (domain.Ma
 	var escotista mappa.Escotista
 	var dbEscotista domain.MappaEscotista
 
-	msg, err := SendMessage(ctx.ChatId, consts.HourglassNotDone+" Obtendo dados do escotista...", mainMsg.MessageID)
+	msg := bot2.GetCurrentBot().SendTextReply(ctx.ChatId, consts.HourglassNotDone+" Obtendo dados do escotista...", mainMsg.MessageID)
+	escotista, err := MappaGetEscotista(ctx, ctx.MappaUserId)
 	if err != nil {
-		return dbEscotista, err
-	}
-	escotista, err = MappaGetEscotista(ctx, ctx.MappaUserId)
-	if err != nil {
-		EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao obter o escotista: %v", consts.Warning, err))
+		bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao obter o escotista: %v", consts.Warning, err))
 		return dbEscotista, err
 	}
 	dbEscotista = domain.MappaEscotista{
@@ -299,10 +250,10 @@ func mappaSaveEscotista(ctx domain.Context, mainMsg tgbotapi.Message) (domain.Ma
 	}
 	err = repository.SaveEscotista(dbEscotista)
 	if err != nil {
-		EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao gravar o escotista: %v", consts.Warning, err))
+		bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Erro ao gravar o escotista: %v", consts.Warning, err))
 		return dbEscotista, err
 	}
-	EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Escotista gravado com sucesso: %s", consts.ThumsUp, dbEscotista.NomeCompleto))
+	bot2.GetCurrentBot().EditMessage(ctx.ChatId, msg.MessageID, fmt.Sprintf("%s Escotista gravado com sucesso: %s", consts.ThumsUp, dbEscotista.NomeCompleto))
 	return dbEscotista, nil
 }
 

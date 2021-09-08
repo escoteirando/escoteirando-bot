@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func CommandSetup(ctx domain.Context, message *tgbotapi.Message) {
+func CommandSetup(_ domain.Context, message *tgbotapi.Message) {
 	env := utils.GetEnvironmentSetup()
 	ctxFrontend := domain.FrontendContext{
 		CId: message.Chat.ID,

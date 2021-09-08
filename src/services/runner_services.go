@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/guionardo/escoteirando-bot/src/domain"
 	"github.com/guionardo/escoteirando-bot/src/repository"
+	"github.com/guionardo/escoteirando-bot/src/utils"
 	"log"
 	"time"
 )
@@ -36,13 +37,13 @@ func RunnerSaveStatus() {
 	result := repository.GetDB().Model(&domain.Run{}).Where("id = ?", currentRunId).Update("end", time.Now())
 	repository.YouCanWrite()
 	if result.Error == nil {
-		log.Printf("Runner status: %v", time.Now())
+		log.Printf("runner status: %v", time.Now())
 	}
 }
 
 func RunnerLastCompleteRun() (domain.Run, error) {
 	if lastRun.ID == 0 {
-		return lastRun, fmt.Errorf("No last run")
+		return lastRun, fmt.Errorf("no last run")
 	}
 	return lastRun, nil
 }
@@ -66,4 +67,13 @@ func RunnerRunningTime(justThisRunning bool) time.Duration {
 		}
 	}
 	return time.Duration(0)
+}
+
+func FirstRunningTime() time.Time {
+	var running domain.Run
+	result := repository.GetDB().First(&running)
+	if result.Error == nil && result.RowsAffected > 0 {
+		return running.Start
+	}
+	return utils.Epoch
 }

@@ -19,7 +19,7 @@ func (cache *CachedMappaProgressao) GetProgressao(codAtividade int) (domain.Mapp
 	}
 	var progressao domain.MappaProgressao
 	response := GetDB().First(&progressao, codAtividade)
-	err := parseResponse(response, "GetProgressao", codAtividade)
+	err := ParseResponse(response, "GetProgressao", codAtividade)
 	if err == nil {
 		cache.progressoes[codAtividade] = progressao
 	}

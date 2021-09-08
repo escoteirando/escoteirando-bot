@@ -45,14 +45,14 @@ func MappaValidateProgressoes(marcacoes []mappa.Marcacao) error {
 		return result.Error
 	}
 	if count < 1 {
-		return fmt.Errorf("Empty progressoes table")
+		return fmt.Errorf("empty progressoes table")
 	}
 	set := hashset.New()
 	for _, marcacao := range marcacoes {
 		set.Add(marcacao.CodigoAtividade)
 	}
 	if set.Size() == 0 {
-		return fmt.Errorf("Empty codAtividade")
+		return fmt.Errorf("empty codAtividade")
 	}
 
 	result = repository.GetDB().Model(&domain.MappaProgressao{}).Where("id NOT IN ?", set.Values()).Count(&count)
@@ -60,7 +60,7 @@ func MappaValidateProgressoes(marcacoes []mappa.Marcacao) error {
 		return result.Error
 	}
 	if count > 0 {
-		return fmt.Errorf("There are %d unloaded progressoes", count)
+		return fmt.Errorf("there are %d unloaded progressoes", count)
 	}
 	return nil
 }

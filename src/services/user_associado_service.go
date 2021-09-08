@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	bot2 "github.com/guionardo/escoteirando-bot/src/bot"
 	"github.com/guionardo/escoteirando-bot/src/consts"
 	"github.com/guionardo/escoteirando-bot/src/domain"
 	"github.com/guionardo/escoteirando-bot/src/repository"
@@ -10,23 +11,24 @@ import (
 
 func MappaVinculaAssociado(ctx domain.Context, message *tgbotapi.Message, codigoAssociado string) {
 	associado, err := repository.FindAssociado(codigoAssociado)
+	cbot:=bot2.GetCurrentBot()
 	if err != nil {
-		SendMessage(ctx.ChatId, fmt.Sprintf("%s O código de associado não foi encontrado", consts.Warning), message.MessageID)
+		cbot.SendTextReply(ctx.ChatId, fmt.Sprintf("%s O código de associado não foi encontrado", consts.Warning), message.MessageID)
 		return
 	}
 	err = repository.VincularAssociado(associado, message.From)
 	if err != nil {
-		SendMessage(ctx.ChatId, fmt.Sprintf("%s Não foi possível vincular o associado %v", consts.Warning, err), message.MessageID)
+		cbot.SendTextReply(ctx.ChatId, fmt.Sprintf("%s Não foi possível vincular o associado %v", consts.Warning, err), message.MessageID)
 	} else {
-		SendMessage(ctx.ChatId, fmt.Sprintf("%s O associado %s foi vinculado ao usuário %s", consts.ThumsUp, associado.ToString(), message.From.String()), message.MessageID)
+		cbot.SendTextReply(ctx.ChatId, fmt.Sprintf("%s O associado %s foi vinculado ao usuário %s", consts.ThumsUp, associado.ToString(), message.From.String()), message.MessageID)
 	}
 	//if err!=nil{
 	//	codAssociado,err:=strconv.Atoi(codigoAssociado[0:len(codigoAssociado)-1])
 	//	if err!=nil{
-	//		SendMessage(ctx.ChatId,fmt.Sprintf("%s Erro na identificação do código do associado %v",consts.Warning,err),message.MessageID)
+	//		sendMessage(ctx.ChatId,fmt.Sprintf("%s Erro na identificação do código do associado %v",consts.Warning,err),message.MessageID)
 	//		return
 	//	}
-	//	msg,err := SendMessage(ctx.ChatId,fmt.Sprintf("%s Localizando associado...",consts.HourglassNotDone),message.MessageID)
+	//	msg,err := sendMessage(ctx.ChatId,fmt.Sprintf("%s Localizando associado...",consts.HourglassNotDone),message.MessageID)
 	//	mappaAssociado,err:=MappaGetAssociado(ctx,codAssociado)
 	//	if err==nil{
 	//		EditMessage(ctx.ChatId,msg.MessageID,fmt.Sprintf("%s Associado localizado: %s",consts.ThumsUp,mappaAssociado.Nome))

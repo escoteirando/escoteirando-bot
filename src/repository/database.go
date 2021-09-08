@@ -13,13 +13,13 @@ var (
 	currentDb *gorm.DB = nil
 )
 
-func SetupDatabase(databaseFile string) error {
+func SetupDatabase() error {
 	env := utils.GetEnvironmentSetup()
 	config := gorm.Config{}
 	if env.BotDebug {
 		config.Logger = logger.Default.LogMode(logger.Info)
 	}
-	db, err := gorm.Open(sqlite.Open(databaseFile), &config)
+	db, err := gorm.Open(sqlite.Open(env.DatabaseFile), &config)
 	if err != nil {
 		return err
 	}
@@ -35,8 +35,12 @@ func SetupDatabase(databaseFile string) error {
 	db.AutoMigrate(&domain.MappaSubSecao{})
 	db.AutoMigrate(&domain.MappaMarcacao{})
 	db.AutoMigrate(&domain.MappaProgressao{})
+	db.AutoMigrate(&domain.MappaConquista{})
 	db.AutoMigrate(&domain.Run{})
 	db.AutoMigrate(&domain.Schedule{})
+	db.AutoMigrate(&domain.MappaEspecialidade{})
+	db.AutoMigrate(&domain.MappaEspecialidadeItem{})
+	db.AutoMigrate(&domain.UserTalk{})
 
 	log.Printf("Database is open")
 	currentDb = db

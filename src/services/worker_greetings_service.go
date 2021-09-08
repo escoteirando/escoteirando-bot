@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	bot2 "github.com/guionardo/escoteirando-bot/src/bot"
 	"github.com/guionardo/escoteirando-bot/src/consts"
 	"github.com/guionardo/escoteirando-bot/src/repository"
 	"log"
@@ -20,20 +21,25 @@ func SendGreetings() {
 	}
 
 	for _, chat := range chats {
-		secao, err := MappaGetSecao(chat.CodSecao)
 		msgSecao := "Seção não identificada"
-		if err == nil {
-			grupo, err := MappaGetGrupoFromCode(secao.CodGrupo)
+		if chat.ID == GetAdminChatId() {
+			msgSecao = "Chat de administração geral"
+		} else {
+			secao, err := MappaGetSecao(chat.CodSecao)
+
 			if err == nil {
-				msgSecao = fmt.Sprintf("%s do GE %s", secao.ToString(), grupo.ToString())
+				grupo, err := MappaGetGrupoFromCode(secao.CodGrupo)
+				if err == nil {
+					msgSecao = fmt.Sprintf("%s do GE %s", secao.ToString(), grupo.ToString())
+				}
 			}
 		}
 
-		_, err = SendTextMessage(chat.ID, fmt.Sprintf("%s Escoteirando Bot ativo!\n%s\n%s", consts.Robot, msgSecao, msgRun), 0)
-		if err == nil {
-			log.Printf("Greeting sent to chat #%d", chat.ID)
-		} else {
-			log.Printf("Greeting not sent to chat #%d %v", chat.ID, err)
-		}
+		bot2.GetCurrentBot().SendTextMessage(chat.ID, fmt.Sprintf("%s Escoteirando Bot ativo!\n%s\n%s\n%s",
+			consts.Robot,
+			GreetingTime(),
+			msgSecao, msgRun))
+
+		log.Printf("Greeting sent to chat #%d", chat.ID)
 	}
 }

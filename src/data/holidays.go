@@ -1,18 +1,11 @@
-package services
+package data
 
 import (
-	"fmt"
 	"github.com/guionardo/escoteirando-bot/src/consts"
-	"github.com/guionardo/escoteirando-bot/src/repository"
+
 	"github.com/rickar/cal/v2"
 	"github.com/rickar/cal/v2/aa"
-	"log"
 	"time"
-)
-
-const (
-	birthdaySchedule string = "birthday"
-	holidaySchedule  string = "holiday"
 )
 
 var (
@@ -89,7 +82,7 @@ var (
 	// Natal represents Christmas Day on 25-Dec
 	Natal = aa.ChristmasDay.Clone(&cal.Holiday{Name: "Natal", Description: consts.ArvoreNatal, Type: cal.ObservancePublic})
 
-	// 23/04 - Dia mundial do escoteiro
+	// Escoteiro 23/04 - Dia mundial do escoteiro
 	Escoteiro = &cal.Holiday{
 		Name:        "Dia Mundial do Escoteiro",
 		Description: consts.FlorDeLis,
@@ -99,7 +92,7 @@ var (
 		Func:        cal.CalcDayOfMonth,
 	}
 
-	// 01/08 - Dia mundial do escotismo
+	// Escotismo 01/08 - Dia mundial do escotismo
 	Escotismo = &cal.Holiday{
 		Name:        "Dia Mundial do Escotismo",
 		Description: consts.FlorDeLis,
@@ -109,7 +102,7 @@ var (
 		Func:        cal.CalcDayOfMonth,
 	}
 
-	// 04/10 - Dia mundial do lobinho
+	// Lobinho 04/10 - Dia mundial do lobinho
 	Lobinho = &cal.Holiday{
 		Name:        "Dia Mundial do Lobinho",
 		Description: consts.MelhorPossivel,
@@ -119,7 +112,7 @@ var (
 		Func:        cal.CalcDayOfMonth,
 	}
 
-	// 29/06 - Dia do pioneiro
+	// Pioneiro 29/06 - Dia do pioneiro
 	Pioneiro = &cal.Holiday{
 		Name:        "Dia do Pioneiro",
 		Description: consts.FlorDeLis,
@@ -129,7 +122,7 @@ var (
 		Func:        cal.CalcDayOfMonth,
 	}
 
-	// 06/08 - Dia do chefe escoteiro
+	// Chefe 06/08 - Dia do chefe escoteiro
 	Chefe = &cal.Holiday{
 		Name:        "Dia do Chefe Escoteiro",
 		Description: consts.FlorDeLis,
@@ -139,7 +132,7 @@ var (
 		Func:        cal.CalcDayOfMonth,
 	}
 
-	// 18/06 - Dia do Sênior
+	// Senior 18/06 - Dia do Sênior
 	Senior = &cal.Holiday{
 		Name:        "Dia do Sênior/Guia",
 		Description: consts.FlorDeLis,
@@ -157,28 +150,13 @@ var (
 		Day:         time.Now().Day(),
 		Func:        cal.CalcDayOfMonth,
 	}
-
-	// Holidays provides a list of the standard national holidays
-	Holidays = []*cal.Holiday{
-		AnoNovo,
-		Tiradentes,
-		Trabalhador,
-		Independencia,
-		NossaSenhoraAparecida,
-		Finados,
-		Republica,
-		CorpusChristi,
-		SextaFeiraSanta,
-		Carnaval,
-		Natal,
-	}
 )
 
-func SetupCalendar() {
+func init() {
 	calendar = cal.NewBusinessCalendar()
 	calendar.Name = "Calendário Escoteiro"
 	calendar.AddHoliday(
-		TesteHoje,
+		//TesteHoje,
 		AnoNovo,
 		Tiradentes,
 		Trabalhador,
@@ -199,93 +177,14 @@ func SetupCalendar() {
 	)
 }
 
+func GetHolidaysFromToday() []*cal.Holiday {
+	return GetHolidaysFromDay(time.Now())
+}
+
 func GetHolidaysFromDay(day time.Time) []*cal.Holiday {
 	var holidays []*cal.Holiday
 	if _, _, holiday := calendar.IsHoliday(day); holiday != nil {
 		holidays = append(holidays, holiday)
 	}
 	return holidays
-}
-
-func GetBirthDaysFromDay(day time.Time, codSecao int) []*cal.Holiday {
-	return GetBirthDaysFromDays(day, day, codSecao)
-}
-
-func GetBirthDaysFromDays(from time.Time, to time.Time, codSecao int) []*cal.Holiday {
-	var holidays []*cal.Holiday
-
-	birthdays := repository.GetBirthdays(codSecao, from, to)
-	for _, birthday := range birthdays {
-		holiday := &cal.Holiday{
-			Name:  fmt.Sprintf("%s %s %s", consts.Birthday, birthday.DataNascimento.Format("02/01"), birthday.Nome),
-			Month: birthday.DataNascimento.Month(),
-			Day:   birthday.DataNascimento.Day(),
-		}
-		holidays = append(holidays, holiday)
-	}
-	return holidays
-}
-
-func PublishHolidays() {
-	schedule, canContinue := ScheduleGet(holidaySchedule, time.Duration(24)*time.Hour, true)
-	if !canContinue {
-		return
-	}
-	sections, err := repository.GetAllSections()
-	if err != nil {
-		log.Printf("Error getting sections %v", err)
-		return
-	}
-	for _, section := range sections {
-
-		holidayStr := ""
-		for _, holiday := range GetHolidaysFromDay(time.Now()) {
-			holidayStr = fmt.Sprintf("%s %s (%02d/%02d) %s\n", holidayStr, holiday.Description, holiday.Day, holiday.Month, holiday.Name)
-		}
-
-		if len(holidayStr) == 0 {
-			continue
-		}
-
-		chats, err := repository.GetChatsFromCodSecao(section.ID)
-		if err != nil {
-			continue
-		}
-		for _, chat := range chats {
-			SendTextMessage(chat.ID, holidayStr, 0)
-		}
-
-	}
-	ScheduleUpdate(&schedule)
-}
-
-func PublishBirthdays() {
-	birthdayInterval := time.Duration(24*7) * time.Hour
-	schedule, canRun := ScheduleGet(birthdaySchedule, birthdayInterval, true)
-	if !canRun {
-		return
-	}
-	sections, err := repository.GetAllSections()
-	if err != nil {
-		log.Printf("Error getting sections %v", err)
-		return
-	}
-	for _, section := range sections {
-
-		birthdayStr := ""
-		for _, birthday := range GetBirthDaysFromDays(time.Now(), time.Now().Add(birthdayInterval), section.ID) {
-			birthdayStr = birthdayStr + birthday.Name + "\n"
-		}
-
-		chats, err := repository.GetChatsFromCodSecao(section.ID)
-		if err != nil {
-			continue
-		}
-		for _, chat := range chats {
-			if len(birthdayStr) > 0 {
-				SendTextMessage(chat.ID, fmt.Sprintf("<b>Aniversários</b>\n%s", birthdayStr), 0)
-			}
-		}
-	}
-	ScheduleUpdate(&schedule)
 }

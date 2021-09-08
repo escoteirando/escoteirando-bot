@@ -1,6 +1,8 @@
 package domain
 
-import "time"
+import (
+	"time"
+)
 
 type (
 	Context struct {
@@ -10,6 +12,7 @@ type (
 		AuthKey        string
 		MappaUserId    int
 		AuthValidUntil time.Time
+		UserIsAdmin    bool
 	}
 	FrontendContext struct {
 		CId int64 `json:"cId"`

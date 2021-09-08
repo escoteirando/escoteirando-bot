@@ -25,7 +25,7 @@ type MappaAssociado struct {
 	LinhaFormacao           string
 	CodigoRamoAdulto        int
 	DataAcompanhamento      time.Time
-	Users []*User `gorm:"many2many:user_associados;"`
+	Users                   []*User `gorm:"many2many:user_associados;"`
 }
 
 var tiposMembro = map[int][]string{

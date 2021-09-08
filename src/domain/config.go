@@ -6,6 +6,6 @@ type (
 	Config struct {
 		gorm.Model
 		LastMessageOffset int
-		AdminGroup int
+		AdminChat         int64
 	}
 )

@@ -11,7 +11,7 @@ func MappaGetSecao(codSecao int) (domain.MappaSecao, error) {
 	return secao, result.Error
 }
 
-func MappaSyncSecao(codSecao int) (domain.MappaSecao,error){
-return nil,nil
-}
-
+//func MappaSyncSecao(codSecao int) (domain.MappaSecao,error){
+//return nil,nil
+//}
+// TODO: Implementar sync de seção

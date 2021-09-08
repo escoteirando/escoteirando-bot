@@ -70,3 +70,35 @@ func TestRoundStart(t *testing.T) {
 		})
 	}
 }
+
+func TestSameDay(t *testing.T) {
+	type args struct {
+		date1 time.Time
+		date2 time.Time
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{{
+		name: "Same date",
+		args: args{
+			date1: time.Date(2000, 1, 1, 10, 10, 10, 0, time.Local),
+			date2: time.Date(2000, 1, 1, 23, 20, 0, 0, time.Local)},
+		want: true,
+	}, {
+		name: "Not same date",
+		args: args{
+			date1: time.Date(2000, 2, 1, 0, 0, 0, 0, time.Local),
+			date2: time.Date(2000, 1, 1, 0, 0, 0, 0, time.Local)},
+		want: false,
+	},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SameDay(tt.args.date1, tt.args.date2); got != tt.want {
+				t.Errorf("SameDay() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

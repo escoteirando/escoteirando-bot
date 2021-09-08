@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	bot2 "github.com/guionardo/escoteirando-bot/src/bot"
 	"github.com/guionardo/escoteirando-bot/src/domain"
 	"strings"
 	"time"
@@ -16,10 +17,6 @@ type (
 	}
 
 	Chats map[int]ChatUsers
-)
-
-var (
-	chats = make(Chats, 0)
 )
 
 func NewUsersMessage(members *[]tgbotapi.User, chatId int64) {
@@ -43,9 +40,8 @@ func NewUsersMessage(members *[]tgbotapi.User, chatId int64) {
 Para ligar o associado (membro juvenil ou adulto) ao seu usuário aqui no grupo, use o comando
 /associado REGISTRO_UEB
 (número que consta na carteirinha).`
-	msg = fmt.Sprintf(msg, strings.Join(users, ", "), convite)
-	topic := tgbotapi.NewMessage(chatId, msg)
 
-	bot, _ := GetBot()
-	bot.Send(topic)
+	msg = fmt.Sprintf(msg, strings.Join(users, ", "), convite)
+	bot2.GetCurrentBot().SendTextMessage(chatId, msg)
+	
 }

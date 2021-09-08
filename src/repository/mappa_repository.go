@@ -4,10 +4,10 @@ import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/guionardo/escoteirando-bot/src/domain"
+	"github.com/guionardo/escoteirando-bot/src/dto"
 	"github.com/guionardo/escoteirando-bot/src/mappa"
-	"github.com/guionardo/escoteirando-bot/src/utils"
-	"gorm.io/gorm"
-	"time"
+	"gorm.io/gorm/clause"
+	"log"
 )
 
 func SaveEscotista(escotista domain.MappaEscotista) error {
@@ -89,51 +89,25 @@ func VincularAssociado(associado domain.MappaAssociado, user *tgbotapi.User) err
 	return nil
 }
 
-func GetUltimaConsultaMarcacao(codSecao int) time.Time {
-	var secao domain.MappaSecao
-	response := GetDB().Find(&secao, codSecao)
-	if response.Error != nil {
-		return time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-	}
-	return secao.UltimaConsultaMarcacao
-}
 
-func SetUltimaConsultaMarcacao(codSecao int, quando time.Time) error {
-	var secao domain.MappaSecao
-	response := GetDB().Find(&secao, codSecao)
-	if response.Error != nil {
-		return response.Error
+
+func SaveProgressoes(progressoes []mappa.Progressao) error {
+	if len(progressoes) == 0 {
+		return fmt.Errorf("empty progressoes list")
+	}
+	dbProgressoes := make([]domain.MappaProgressao, len(progressoes))
+	for i, mappaProgressao := range progressoes {
+		dbProgressoes[i] = dto.CreateProgressao(mappaProgressao)
 	}
 	CanIWrite()
-	secao.UltimaConsultaMarcacao = quando
-	response = GetDB().Save(&secao)
+	result := GetDB().
+		Clauses(clause.OnConflict{UpdateAll: true}).
+		CreateInBatches(dbProgressoes, 10)
 	YouCanWrite()
-	return response.Error
-}
-
-func SetMarcacoes(marcacoes []mappa.Marcacao) error {
-	dbMarcacoes := make([]domain.MappaMarcacao, len(marcacoes))
-	uniqueSequence := utils.NewUniqueSequence()
-	for i, marcacao := range marcacoes {
-		dbMarcacoes[i] = domain.MappaMarcacao{
-			Model:                 gorm.Model{ID: uniqueSequence.GetNext()},
-			CodigoAtividade:       marcacao.CodigoAtividade,
-			CodigoAssociado:       marcacao.CodigoAssociado,
-			DataAtividade:         utils.TimeParse(marcacao.DataAtividade),
-			DataStatusJovem:       utils.TimeParse(marcacao.DataStatusJovem),
-			DataStatusEscotista:   utils.TimeParse(marcacao.DataStatusEscotista),
-			StatusJovem:           marcacao.StatusJovem,
-			StatusEscotista:       marcacao.StatusEscotista,
-			DataHoraAtualizacao:   utils.TimeParse(marcacao.DataHoraAtualizacao),
-			CodigoUltimoEscotista: marcacao.CodigoUltimoEscotista,
-			Segmento:              marcacao.Segmento,
-			NotificadoChat:        false,
-			Associado:             domain.MappaAssociado{},
-			Progressao:            domain.MappaProgressao{},
-		}
+	if result.Error != nil {
+		log.Printf("Error saving progressoes: %v", result.Error)
+		return result.Error
 	}
-	CanIWrite()
-	result := GetDB().Save(&dbMarcacoes)
-	YouCanWrite()
-	return result.Error
+	log.Printf("Progressoes saved: %d", len(progressoes))
+	return nil
 }

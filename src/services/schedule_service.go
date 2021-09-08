@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"github.com/guionardo/escoteirando-bot/src/domain"
 	"github.com/guionardo/escoteirando-bot/src/repository"
 	"github.com/guionardo/escoteirando-bot/src/utils"
@@ -42,7 +43,7 @@ func ScheduleUpdate(schedule *domain.Schedule) bool {
 	schedule.NextRun = nextRun
 	if err := repository.GetDB().Save(&schedule).Error; err != nil {
 		log.Printf("Failed to add %s - %v", schedule.ToString(), err)
-		//TODO: Gerar notificação para o administrador
+		SendMessageToAdminChat(fmt.Sprintf("Failed to add schedule %s - %v", schedule.ToString(), err))
 		return false
 	}
 	log.Printf("Added %s", schedule.ToString())

@@ -15,7 +15,7 @@ func NewUniqueSequence() UniqueSequence {
 		current: 0,
 	}
 }
-func (us UniqueSequence) GetNext() uint {
+func (us *UniqueSequence) GetNext() uint {
 	us.Lock()
 	n := time.Now().Unix()
 	if us.current == n {

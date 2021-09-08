@@ -3,33 +3,44 @@ package services
 import (
 	"github.com/guionardo/escoteirando-bot/src/domain"
 	"github.com/guionardo/escoteirando-bot/src/repository"
-
 )
 
+var (
+	CurrentConfig *domain.Config
+)
+
+func readConfig() *domain.Config {
+	if CurrentConfig == nil {
+		config, err := repository.GetConfig()
+		if err == nil {
+			CurrentConfig = &config
+		} else {
+			CurrentConfig = &domain.Config{
+				LastMessageOffset: 0,
+				AdminChat:         0,
+			}
+			err = repository.SetConfig(CurrentConfig)
+		}
+	}
+	return CurrentConfig
+}
 
 func GetChatOffset() int {
-	var db = repository.GetDB()
-	var config domain.Config
-	result := db.First(&config)
-	if result.RowsAffected == 0 || result.Error != nil {
-		return 0
-	}
-	return config.LastMessageOffset
+	return readConfig().LastMessageOffset
 }
 
 func SetChatOffset(offset int) bool {
-	var db = repository.GetDB()
-	var config domain.Config
-	result := db.First(&config)
-	if result.RowsAffected == 0 || result.Error != nil {
-		config = domain.Config{
-			LastMessageOffset: offset,
-			AdminGroup:        0,
-		}
-		result = db.Create(&config)
+	readConfig()
+	CurrentConfig.LastMessageOffset = offset
+	return repository.SetConfig(CurrentConfig) == nil
+}
 
-	} else {
-		result = db.Model(&config).Update("LastMessageOffset", offset)
-	}
-	return result.RowsAffected > 0
+func GetAdminChatId() int64 {
+	return readConfig().AdminChat
+}
+
+func SetAdminChatId(chatId int64) bool {
+	readConfig()
+	CurrentConfig.AdminChat = chatId
+	return repository.SetConfig(CurrentConfig) == nil
 }
